@@ -1,7 +1,7 @@
 # BEGIN: You can modify the following region
 PROJECT = camera-profiling
 DEBUG ?= 0
-CFLAGS ?=
+CFLAGS ?=-O0
 LDFLAGS ?=
 ASFLAGS ?=
 # END.

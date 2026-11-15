@@ -45,15 +45,51 @@ static uint32_t sobelKernel(uint32_t line, uint32_t width, uint32_t pixel) {
 
     int32_t valueX = 0;
     int32_t valueY = 0;
+    int32_t gray;
 
-    for (int32_t dx = -1; dx < 2; dx++) {
-        for (int32_t dy = -1; dy < 2; dy++) {
-            uint32_t index = ((line + ((uint32_t)dy)) * width) + ((uint32_t)dx) + pixel;
-            int32_t gray = (int32_t)(grayscale[index]);
-            valueX += gray * gx_array[dy + 1][dx + 1];
-            valueY += gray * gy_array[dy + 1][dx + 1];
-        }
-    }
+    // both loops (dx and dy = -1, 0, +1) unrolled by hand
+    uint32_t top = ((line - 1) * width) + pixel; // index of (dx = 0, dy = -1)
+    uint32_t mid = top + width;                  // index of (dx = 0, dy =  0)
+    uint32_t bot = mid + width;                  // index of (dx = 0, dy = +1)
+
+    // dx = -1
+    gray = (int32_t)(grayscale[top - 1]); // dy = -1
+    valueX += gray * gx_array[0][0];
+    valueY += gray * gy_array[0][0];
+
+    gray = (int32_t)(grayscale[mid - 1]); // dy = 0
+    valueX += gray * gx_array[1][0];
+    valueY += gray * gy_array[1][0];
+
+    gray = (int32_t)(grayscale[bot - 1]); // dy = +1
+    valueX += gray * gx_array[2][0];
+    valueY += gray * gy_array[2][0];
+
+    // dx = 0
+    gray = (int32_t)(grayscale[top]); // dy = -1
+    valueX += gray * gx_array[0][1];
+    valueY += gray * gy_array[0][1];
+
+    gray = (int32_t)(grayscale[mid]); // dy = 0
+    valueX += gray * gx_array[1][1];
+    valueY += gray * gy_array[1][1];
+
+    gray = (int32_t)(grayscale[bot]); // dy = +1
+    valueX += gray * gx_array[2][1];
+    valueY += gray * gy_array[2][1];
+
+    // dx = +1
+    gray = (int32_t)(grayscale[top + 1]); // dy = -1
+    valueX += gray * gx_array[0][2];
+    valueY += gray * gy_array[0][2];
+
+    gray = (int32_t)(grayscale[mid + 1]); // dy = 0
+    valueX += gray * gx_array[1][2];
+    valueY += gray * gy_array[1][2];
+
+    gray = (int32_t)(grayscale[bot + 1]); // dy = +1
+    valueX += gray * gx_array[2][2];
+    valueY += gray * gy_array[2][2];
 
     int32_t result = (valueX < 0) ? -valueX : valueX;
     result += (valueY < 0) ? -valueY : valueY;
@@ -136,7 +172,7 @@ int main() {
     perf_stop();
     delay_blocking_usec(1);
     perf_print_cycles(PERF_COUNTER_RUNTIME, "Single sobel kernel cycles");
-    printf("Single sobel kernel result     : %lu\n", (unsigned long)kernel_result);
+    perf_print_time(PERF_COUNTER_RUNTIME, "Sobel kernel time");
 
     return 0;
 }

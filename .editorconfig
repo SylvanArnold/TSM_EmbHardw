@@ -20,3 +20,8 @@ indent_style = tab
 
 [*.yaml]
 indent_size = 2
+
+# Generated FPGA memory images: the loader needs the exact bytes (incl. trailing spaces)
+[*.{cmem,mem}]
+trim_trailing_whitespace = false
+insert_final_newline = false

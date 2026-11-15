@@ -47,73 +47,75 @@ static void grayscaleFilter(uint32_t width, uint32_t height) {
     }
 }
 
-static uint32_t sobelKernel(uint32_t line, uint32_t width, uint32_t pixel) {
-    // clang-format off
-    const int32_t gx_array[3][3] = {
-        {-1, 0, 1},
-        {-2, 0, 2},
-        {-1, 0, 1}
-    };
-    const int32_t gy_array[3][3] = {
-        {1, 2, 1},
-        {0, 0, 0},
-        {-1, -2, -1}
-    };
-    // clang-format on
+// clang-format off
+static const int32_t gx_array[3][3] = {
+    {-1, 0, 1},
+    {-2, 0, 2},
+    {-1, 0, 1}
+};
+static const int32_t gy_array[3][3] = {
+    {1, 2, 1},
+    {0, 0, 0},
+    {-1, -2, -1}
+};
+// clang-format on
 
-    int32_t valueX = 0;
-    int32_t valueY = 0;
-    int32_t gray;
-
-    // both loops (dx and dy = -1, 0, +1) unrolled by hand
-    uint32_t top = ((line - 1) * width) + pixel; // index of (dx = 0, dy = -1)
-    uint32_t mid = top + width;                  // index of (dx = 0, dy =  0)
-    uint32_t bot = mid + width;                  // index of (dx = 0, dy = +1)
-
-    // dx = -1
-    gray = (int32_t)(grayscale[top - 1]); // dy = -1
-    valueX += gray * gx_array[0][0];
-    valueY += gray * gy_array[0][0];
-
-    gray = (int32_t)(grayscale[mid - 1]); // dy = 0
-    valueX += gray * gx_array[1][0];
-    valueY += gray * gy_array[1][0];
-
-    gray = (int32_t)(grayscale[bot - 1]); // dy = +1
-    valueX += gray * gx_array[2][0];
-    valueY += gray * gy_array[2][0];
-
-    // dx = 0
-    gray = (int32_t)(grayscale[top]); // dy = -1
-    valueX += gray * gx_array[0][1];
-    valueY += gray * gy_array[0][1];
-
-    gray = (int32_t)(grayscale[mid]); // dy = 0
-    valueX += gray * gx_array[1][1];
-    valueY += gray * gy_array[1][1];
-
-    gray = (int32_t)(grayscale[bot]); // dy = +1
-    valueX += gray * gx_array[2][1];
-    valueY += gray * gy_array[2][1];
-
-    // dx = +1
-    gray = (int32_t)(grayscale[top + 1]); // dy = -1
-    valueX += gray * gx_array[0][2];
-    valueY += gray * gy_array[0][2];
-
-    gray = (int32_t)(grayscale[mid + 1]); // dy = 0
-    valueX += gray * gx_array[1][2];
-    valueY += gray * gy_array[1][2];
-
-    gray = (int32_t)(grayscale[bot + 1]); // dy = +1
-    valueX += gray * gx_array[2][2];
-    valueY += gray * gy_array[2][2];
-
-    int32_t result = (valueX < 0) ? -valueX : valueX;
-    result += (valueY < 0) ? -valueY : valueY;
-
-    return (uint32_t)result;
-}
+// Compute the sobel kernel at (line, pixel) and assign |Gx| + |Gy| to result.
+// A macro (not a function) so the kernel is inlined at every use, even at -O0.
+// Locals are prefixed with sk_ so they cannot capture names from the arguments.
+#define SOBEL_KERNEL(line, width, pixel, result)                                      \
+    do {                                                                              \
+        int32_t sk_valueX = 0;                                                        \
+        int32_t sk_valueY = 0;                                                        \
+        int32_t sk_gray;                                                              \
+                                                                                      \
+        /* both loops (dx and dy = -1, 0, +1) unrolled by hand */                     \
+        uint32_t sk_top = (((line) - 1) * (width)) + (pixel); /* (dx = 0, dy = -1) */ \
+        uint32_t sk_mid = sk_top + (width);                   /* (dx = 0, dy =  0) */ \
+        uint32_t sk_bot = sk_mid + (width);                   /* (dx = 0, dy = +1) */ \
+                                                                                      \
+        /* dx = -1 */                                                                 \
+        sk_gray = (int32_t)(grayscale[sk_top - 1]); /* dy = -1 */                     \
+        sk_valueX += sk_gray * gx_array[0][0];                                        \
+        sk_valueY += sk_gray * gy_array[0][0];                                        \
+                                                                                      \
+        sk_gray = (int32_t)(grayscale[sk_mid - 1]); /* dy = 0 */                      \
+        sk_valueX += sk_gray * gx_array[1][0];                                        \
+        sk_valueY += sk_gray * gy_array[1][0];                                        \
+                                                                                      \
+        sk_gray = (int32_t)(grayscale[sk_bot - 1]); /* dy = +1 */                     \
+        sk_valueX += sk_gray * gx_array[2][0];                                        \
+        sk_valueY += sk_gray * gy_array[2][0];                                        \
+                                                                                      \
+        /* dx = 0 */                                                                  \
+        sk_gray = (int32_t)(grayscale[sk_top]); /* dy = -1 */                         \
+        sk_valueX += sk_gray * gx_array[0][1];                                        \
+        sk_valueY += sk_gray * gy_array[0][1];                                        \
+                                                                                      \
+        sk_gray = (int32_t)(grayscale[sk_mid]); /* dy = 0 */                          \
+        sk_valueX += sk_gray * gx_array[1][1];                                        \
+        sk_valueY += sk_gray * gy_array[1][1];                                        \
+                                                                                      \
+        sk_gray = (int32_t)(grayscale[sk_bot]); /* dy = +1 */                         \
+        sk_valueX += sk_gray * gx_array[2][1];                                        \
+        sk_valueY += sk_gray * gy_array[2][1];                                        \
+                                                                                      \
+        /* dx = +1 */                                                                 \
+        sk_gray = (int32_t)(grayscale[sk_top + 1]); /* dy = -1 */                     \
+        sk_valueX += sk_gray * gx_array[0][2];                                        \
+        sk_valueY += sk_gray * gy_array[0][2];                                        \
+                                                                                      \
+        sk_gray = (int32_t)(grayscale[sk_mid + 1]); /* dy = 0 */                      \
+        sk_valueX += sk_gray * gx_array[1][2];                                        \
+        sk_valueY += sk_gray * gy_array[1][2];                                        \
+                                                                                      \
+        sk_gray = (int32_t)(grayscale[sk_bot + 1]); /* dy = +1 */                     \
+        sk_valueX += sk_gray * gx_array[2][2];                                        \
+        sk_valueY += sk_gray * gy_array[2][2];                                        \
+                                                                                      \
+        (result) = (uint32_t)(((sk_valueX < 0) ? -sk_valueX : sk_valueX) +            \
+                              ((sk_valueY < 0) ? -sk_valueY : sk_valueY));            \
+    } while (0)
 
 static void sobelFilter(uint32_t width, uint32_t height, uint32_t threshold) {
     // pixels 1 .. width-2 are processed (borders are skipped)
@@ -125,8 +127,12 @@ static void sobelFilter(uint32_t width, uint32_t height, uint32_t threshold) {
         uint32_t pixel = 1;
 
 // Apply the kernel at column p of the current line and store the thresholded result.
-#define SOBEL_PIXEL(p) \
-    out[(p)] = (sobelKernel(line, width, (p)) > threshold) ? 0xFF : 0
+#define SOBEL_PIXEL(p)                                \
+    do {                                              \
+        uint32_t sp_result;                           \
+        SOBEL_KERNEL(line, width, (p), sp_result);    \
+        out[(p)] = (sp_result > threshold) ? 0xFF : 0; \
+    } while (0)
 
         // pixel loop partially unrolled by UNROLL_FACTOR
         for (; pixel < unrolledEnd; pixel += UNROLL_FACTOR) {
@@ -207,7 +213,7 @@ int main() {
     // (result stored in a volatile so the compiler cannot drop the computation)
     volatile uint32_t kernel_result;
     perf_start();
-    kernel_result = sobelKernel(test_line, camParams.nrOfPixelsPerLine, test_pixel);
+    SOBEL_KERNEL(test_line, camParams.nrOfPixelsPerLine, test_pixel, kernel_result);
     perf_stop();
     delay_blocking_usec(1);
     perf_print_cycles(PERF_COUNTER_RUNTIME, "Single sobel kernel cycles");

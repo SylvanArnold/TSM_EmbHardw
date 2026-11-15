@@ -1,2 +1,3 @@
-soc/camera-program/build-release
+soc/*/build-release
 soc/or1300/or1300SingleCore.*
+bin/

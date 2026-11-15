@@ -12,10 +12,14 @@ volatile uint8_t sobel[PIXEL_AMOUNT];
 static void grayscaleFilter(uint32_t width, uint32_t height) {
     for (uint32_t line = 0; line < height; line++) {
         for (uint32_t pixel = 0; pixel < width; pixel++) {
-            uint16_t rgb = swap_u16(rgb565[line * width + pixel]);
+            uint16_t rgb = swap_u16(rgb565[line * width + pixel]); // read encoded rgb pixel
+
+            // extract RGB
             uint32_t red = ((rgb >> 11) & 0x1F) << 3;
             uint32_t green = ((rgb >> 5) & 0x3F) << 2;
             uint32_t blue = (rgb & 0x1F) << 3;
+
+            // Compute grayscale
             uint8_t gray = (uint8_t)((red * 54 + green * 183 + blue * 19) >> 8);
             grayscale[line * width + pixel] = gray;
         }

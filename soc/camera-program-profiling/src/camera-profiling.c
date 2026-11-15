@@ -12,19 +12,37 @@ volatile uint16_t rgb565[PIXEL_AMOUNT];
 volatile uint8_t grayscale[PIXEL_AMOUNT];
 volatile uint8_t sobel[PIXEL_AMOUNT];
 
+// Number of pixels processed per iteration of the unrolled loops
+#define UNROLL_FACTOR 4
+
+// Convert the pixel at index idx from rgb565 to grayscale.
+// A macro (not a function) so the unrolled body really is inlined, even at -O0.
+#define GRAYSCALE_PIXEL(idx)                                                   \
+    do {                                                                       \
+        uint16_t rgb = swap_u16(rgb565[(idx)]); /* read encoded rgb pixel */   \
+        uint32_t red = ((rgb >> 11) & 0x1F) << 3;                              \
+        uint32_t green = ((rgb >> 5) & 0x3F) << 2;                             \
+        uint32_t blue = (rgb & 0x1F) << 3;                                     \
+        grayscale[(idx)] = (uint8_t)((red * 54 + green * 183 + blue * 19) >> 8); \
+    } while (0)
+
 static void grayscaleFilter(uint32_t width, uint32_t height) {
     for (uint32_t line = 0; line < height; line++) {
-        for (uint32_t pixel = 0; pixel < width; pixel++) {
-            uint16_t rgb = swap_u16(rgb565[line * width + pixel]); // read encoded rgb pixel
+        uint32_t idx = line * width;    // index of the first pixel of the line
+        uint32_t lineEnd = idx + width; // index one past the last pixel of the line
+        uint32_t unrolledEnd = idx + (width & ~(uint32_t)(UNROLL_FACTOR - 1));
 
-            // extract RGB
-            uint32_t red = ((rgb >> 11) & 0x1F) << 3;
-            uint32_t green = ((rgb >> 5) & 0x3F) << 2;
-            uint32_t blue = (rgb & 0x1F) << 3;
+        // pixel loop partially unrolled by UNROLL_FACTOR
+        for (; idx < unrolledEnd; idx += UNROLL_FACTOR) {
+            GRAYSCALE_PIXEL(idx);
+            GRAYSCALE_PIXEL(idx + 1);
+            GRAYSCALE_PIXEL(idx + 2);
+            GRAYSCALE_PIXEL(idx + 3);
+        }
 
-            // Compute grayscale
-            uint8_t gray = (uint8_t)((red * 54 + green * 183 + blue * 19) >> 8);
-            grayscale[line * width + pixel] = gray;
+        // remaining pixels (width not a multiple of UNROLL_FACTOR)
+        for (; idx < lineEnd; idx++) {
+            GRAYSCALE_PIXEL(idx);
         }
     }
 }
@@ -98,11 +116,32 @@ static uint32_t sobelKernel(uint32_t line, uint32_t width, uint32_t pixel) {
 }
 
 static void sobelFilter(uint32_t width, uint32_t height, uint32_t threshold) {
+    // pixels 1 .. width-2 are processed (borders are skipped)
+    uint32_t innerWidth = width - 2;
+    uint32_t unrolledEnd = 1 + (innerWidth & ~(uint32_t)(UNROLL_FACTOR - 1));
+
     for (uint32_t line = 1; line < height - 1; line++) {
-        for (uint32_t pixel = 1; pixel < width - 1; pixel++) {
-            uint32_t result = sobelKernel(line, width, pixel);
-            sobel[line * width + pixel] = (result > threshold) ? 0xFF : 0;
+        volatile uint8_t* out = &sobel[line * width]; // start of the output line
+        uint32_t pixel = 1;
+
+// Apply the kernel at column p of the current line and store the thresholded result.
+#define SOBEL_PIXEL(p) \
+    out[(p)] = (sobelKernel(line, width, (p)) > threshold) ? 0xFF : 0
+
+        // pixel loop partially unrolled by UNROLL_FACTOR
+        for (; pixel < unrolledEnd; pixel += UNROLL_FACTOR) {
+            SOBEL_PIXEL(pixel);
+            SOBEL_PIXEL(pixel + 1);
+            SOBEL_PIXEL(pixel + 2);
+            SOBEL_PIXEL(pixel + 3);
         }
+
+        // remaining pixels (innerWidth not a multiple of UNROLL_FACTOR)
+        for (; pixel < width - 1; pixel++) {
+            SOBEL_PIXEL(pixel);
+        }
+
+#undef SOBEL_PIXEL
     }
 }
 
